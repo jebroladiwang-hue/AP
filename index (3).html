@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Routine Tracker</title>
+<style>
+:root{
+  --bg:#f3f6f4; --surface:#ffffff; --ink:#1d2b26; --muted:#5d6e67; --line:#d5ded9;
+  --accent:#1f7a5c; --accent-ink:#ffffff; --done:#e1f2ea; --danger:#b3392f;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121a17; --surface:#1a2420; --ink:#e6efeb; --muted:#93a59d; --line:#2b3a34;
+    --accent:#4cc79c; --accent-ink:#0b1b15; --done:#1f3b30; --danger:#ef8a80;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 "Trebuchet MS","Segoe UI",system-ui,sans-serif;padding:20px 14px 60px}
+main{max-width:720px;margin:0 auto}
+h1{font-size:1.6rem;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 16px}
+.top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.bar{flex:1;min-width:180px;height:10px;background:var(--line);border-radius:6px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.count{font-weight:700}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:6px 12px}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.cat{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.cat>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px 16px;font-weight:700;font-size:1.05rem}
+.cat>summary::-webkit-details-marker{display:none}
+.cat>summary::before{content:"\25B8";color:var(--accent);transition:transform .15s}
+.cat[open]>summary::before{transform:rotate(90deg)}
+.cat .n{margin-left:auto;font-weight:400;color:var(--muted);font-size:.9rem}
+.skill{border-top:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:12px;padding:10px 16px}
+.row.done{background:var(--done)}
+.row input[type=checkbox]{width:22px;height:22px;accent-color:var(--accent);flex:none;cursor:pointer}
+.row .name{flex:1;text-align:left;border:0;background:none;padding:4px 0;font-weight:600}
+.row .name:hover{color:var(--accent)}
+.row .last{color:var(--muted);font-size:.85rem}
+.panel{padding:4px 16px 16px 50px}
+.add{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
+.add label{display:flex;flex-direction:column;font-size:.8rem;color:var(--muted)}
+.add input{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:110px}
+.log{list-style:none;margin:0;padding:0}
+.log li{display:flex;gap:10px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--line);font-size:.92rem}
+.log .d{min-width:96px;color:var(--muted)}
+.log .x{margin-left:auto;border:0;background:none;color:var(--danger);padding:2px 8px}
+.empty{color:var(--muted);font-size:.9rem;margin:0}
+#timerbar{position:sticky;top:8px;z-index:5;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-weight:600}
+#timerbar[hidden]{display:none}
+#timerbar.ring{background:var(--danger)}
+#timerbar .big{font-size:1.4rem;font-variant-numeric:tabular-nums}
+#timerbar .btns{margin-left:auto;display:flex;gap:8px}
+.hd{margin:0 0 6px;font-weight:700;font-size:.85rem;color:var(--muted)}
+.add.tm{margin-bottom:6px}
+.presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.presets button{padding:3px 10px;font-size:.85rem}
+footer{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <div id="timerbar" hidden role="status"></div>
+  <h1>Skill Routine Tracker</h1>
+  <p class="sub">Open a group, tick a skill when you finish it today, or tap its name to log the exact time.</p>
+  <div class="top">
+    <div class="bar" aria-hidden="true"><i id="fill"></i></div>
+    <span class="count" id="count"></span>
+  </div>
+  <div id="app"></div>
+  <footer>
+    <button id="export">Export data</button>
+    <button id="reset">Clear all logs</button>
+  </footer>
+</main>
+
+<script>
+const CATS = [
+  ["Language & Communication", ["English","Japanese","Vocabulary","Speaking","Debate","Social skill","Persuasion / reading people"]],
+  ["Cognitive & Academic", ["Chess","Memorization","Psychology","Science","Coding","Editing"]],
+  ["Visual & Digital Arts", ["Drawing","Digital art"]],
+  ["Music & Vocal", ["Violin","Ukulele","Singing","Vocal synthesis (Vocaloid)"]],
+  ["Performing Arts", ["Dancing","Tap dance","Mime","Magic tricks"]],
+  ["Physical & Athletic", ["Swimming","Aerobics","Parkour","Martial arts / combat","Flexibility","Balance","Juggling"]],
+  ["Personal Care", ["Grooming / beauty care"]]
+];
+const KEY = "skillRoutine:v1";
+let logs = {};
+try { logs = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { logs = {}; }
+// Migrate old position-based keys (e.g. "0-1") to skill names
+(function(){
+  const old = CATS.map(([c, sk]) => sk.filter(n => n !== "Japanese"));
+  Object.keys(logs).forEach(k => {
+    const m = /^(\d+)-(\d+)$/.exec(k);
+    if (!m) return;
+    const name = old[m[1]] && old[m[1]][m[2]];
+    if (name) logs[name] = (logs[name] || []).concat(logs[k]);
+    delete logs[k];
+  });
+  try { localStorage.setItem(KEY, JSON.stringify(logs)); } catch (e) {}
+})();
+const openCats = new Set([0]);
+const openSkills = new Set();
+
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(logs)); } catch (e) {} };
+const today = () => new Date().toLocaleDateString("en-CA");
+const nowTime = () => new Date().toTimeString().slice(0, 5);
+const id = (c, s) => CATS[c][1][s];
+const entries = k => logs[k] || [];
+const doneToday = k => entries(k).some(e => e.d === today());
+
+function fmt12(t){
+  const [h, m] = t.split(":").map(Number);
+  return ((h % 12) || 12) + ":" + String(m).padStart(2, "0") + " " + (h < 12 ? "AM" : "PM");
+}
+function fmtDate(d){
+  if (d === today()) return "Today";
+  return new Date(d + "T00:00").toLocaleDateString(undefined, {month:"short", day:"numeric"});
+}
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function render(){
+  let total = 0, done = 0;
+  const app = document.getElementById("app");
+  app.innerHTML = CATS.map(([cat, skills], ci) => {
+    const catDone = skills.filter((_, si) => doneToday(id(ci, si))).length;
+    total += skills.length; done += catDone;
+    const rows = skills.map((name, si) => {
+      const k = id(ci, si), isDone = doneToday(k), list = entries(k);
+      const last = list.length ? list[list.length - 1] : null;
+      let panel = "";
+      if (openSkills.has(k)) {
+        const recent = list.slice().reverse().slice(0, 12);
+        panel = `<div class="panel">
+          <p class="hd">Timer</p>
+          <div class="add tm">
+            <label>Hours<input type="number" min="0" max="12" id="h-${k}" data-dur="h" value="${lastDur.h}"></label>
+            <label>Minutes<input type="number" min="0" max="59" id="mi-${k}" data-dur="m" value="${lastDur.m}"></label>
+            <button class="primary" data-start="${k}">Start timer</button>
+          </div>
+          <div class="presets">${[15,30,45,60,90,105].map(n => `<button data-preset="${n}" data-k="${k}">${n >= 60 ? Math.floor(n/60) + " h" + (n % 60 ? " " + n % 60 + " min" : "") : n + " min"}</button>`).join("")}</div>
+          <p class="hd">Log a time manually</p>
+          <div class="add">
+            <label>Time<input type="time" id="t-${k}" value="${nowTime()}"></label>
+            <label>Minutes (optional)<input type="number" min="1" id="m-${k}" placeholder="e.g. 30"></label>
+            <button class="primary" data-add="${k}">Add time</button>
+          </div>
+          ${recent.length ? `<ul class="log">${recent.map(e => `<li><span class="d">${fmtDate(e.d)}</span><span>${fmt12(e.t)}${e.m ? " &middot; " + e.m + " min" : ""}</span><button class="x" data-del="${k}" data-i="${list.indexOf(e)}" aria-label="Delete entry">Delete</button></li>`).join("")}</ul>` : `<p class="empty">No time logged yet. Add your first session above.</p>`}
+        </div>`;
+      }
+      return `<div class="skill">
+        <div class="row ${isDone ? "done" : ""}">
+          <input type="checkbox" data-check="${k}" ${isDone ? "checked" : ""} aria-label="Done today: ${esc(name)}">
+          <button class="name" data-open="${k}" aria-expanded="${openSkills.has(k)}">${esc(name)}</button>
+          <span class="last">${last ? "Last: " + fmtDate(last.d) + ", " + fmt12(last.t) : ""}</span>
+        </div>${panel}</div>`;
+    }).join("");
+    return `<details class="cat" data-cat="${ci}" ${openCats.has(ci) ? "open" : ""}>
+      <summary>${esc(cat)}<span class="n">${catDone}/${skills.length} today</span></summary>${rows}</details>`;
+  }).join("");
+  document.getElementById("count").textContent = done + " / " + total + " done today";
+  document.getElementById("fill").style.width = (total ? done / total * 100 : 0) + "%";
+}
+
+document.getElementById("app").addEventListener("click", e => {
+  const t = e.target;
+  if (t.dataset.open) {
+    openSkills.has(t.dataset.open) ? openSkills.delete(t.dataset.open) : openSkills.add(t.dataset.open);
+    render();
+  } else if (t.dataset.add) {
+    const k = t.dataset.add;
+    const time = document.getElementById("t-" + k).value || nowTime();
+    const m = parseInt(document.getElementById("m-" + k).value, 10);
+    (logs[k] = logs[k] || []).push({d: today(), t: time, m: m > 0 ? m : null});
+    save(); render();
+  } else if (t.dataset.del) {
+    logs[t.dataset.del].splice(+t.dataset.i, 1);
+    save(); render();
+  }
+});
+document.getElementById("app").addEventListener("change", e => {
+  const k = e.target.dataset.check;
+  if (!k) return;
+  if (e.target.checked) {
+    (logs[k] = logs[k] || []).push({d: today(), t: nowTime(), m: null});
+  } else {
+    logs[k] = entries(k).filter(x => x.d !== today());
+  }
+  save(); render();
+});
+document.getElementById("app").addEventListener("toggle", e => {
+  const c = e.target.dataset && e.target.dataset.cat;
+  if (c === undefined) return;
+  e.target.open ? openCats.add(+c) : openCats.delete(+c);
+}, true);
+
+document.getElementById("reset").addEventListener("click", () => {
+  if (confirm("Delete every logged time? This cannot be undone.")) { logs = {}; save(); render(); }
+});
+document.getElementById("export").addEventListener("click", () => {
+  const out = [];
+  CATS.forEach(([cat, skills], ci) => skills.forEach((name, si) =>
+    entries(id(ci, si)).forEach(e => out.push([cat, name, e.d, e.t, e.m || ""].join(",")))));
+  const blob = new Blob(["Group,Skill,Date,Time,Minutes\n" + out.join("\n")], {type: "text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "skill-log.csv"; a.click();
+});
+
+// ---------- Timer ----------
+const TKEY = "skillRoutine:timer";
+const BASE_TITLE = document.title;
+const lastDur = {h: 0, m: 30};
+let timer = null, ring = null, audio = null, barState = "";
+try { timer = JSON.parse(localStorage.getItem(TKEY)); } catch (e) { timer = null; }
+const saveTimer = () => { try { timer ? localStorage.setItem(TKEY, JSON.stringify(timer)) : localStorage.removeItem(TKEY); } catch (e) {} };
+const pad = n => String(n).padStart(2, "0");
+function clock(ms){
+  const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return (h ? h + ":" + pad(m) : pad(m)) + ":" + pad(s % 60);
+}
+function beep(){
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    audio.resume();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = 880; g.gain.value = 0.25;
+    o.connect(g); g.connect(audio.destination);
+    o.start(); o.stop(audio.currentTime + 0.3);
+  } catch (e) {}
+}
+function startRing(){
+  if (ring) return;
+  beep();
+  ring = setInterval(() => { beep(); if (navigator.vibrate) navigator.vibrate(250); }, 1000);
+}
+function stopRing(){ clearInterval(ring); ring = null; }
+function logSession(k, startMs, mins){
+  const d = new Date(startMs);
+  (logs[k] = logs[k] || []).push({d: d.toLocaleDateString("en-CA"), t: d.toTimeString().slice(0, 5), m: mins});
+  save();
+}
+function renderBar(){
+  const el = document.getElementById("timerbar");
+  const st = timer ? (timer.finished ? "f" : "r") + timer.k : "";
+  if (st === barState) return;
+  barState = st;
+  if (!timer) { el.hidden = true; el.classList.remove("ring"); document.title = BASE_TITLE; return; }
+  el.hidden = false;
+  if (timer.finished) {
+    el.classList.add("ring");
+    el.innerHTML = `<span>Time is up: ${esc(timer.k)} (${timer.mins} min logged)</span><span class="btns"><button data-tdismiss>Stop alarm</button></span>`;
+  } else {
+    el.classList.remove("ring");
+    el.innerHTML = `<span>${esc(timer.k)}</span><span class="big" id="tleft"></span><span class="btns"><button data-tstop>Stop and log</button><button data-tcancel>Cancel</button></span>`;
+  }
+}
+function finish(){
+  timer.finished = true;
+  logSession(timer.k, timer.start, timer.mins);
+  saveTimer(); startRing(); renderBar(); render();
+  try { if ("Notification" in window && Notification.permission === "granted") new Notification("Time is up", {body: timer.k + " - " + timer.mins + " min"}); } catch (e) {}
+}
+function tickBar(){
+  if (!timer) return;
+  if (!timer.finished) {
+    const left = timer.endAt - Date.now();
+    if (left <= 0) { finish(); return; }
+    const t = document.getElementById("tleft");
+    if (t) t.textContent = clock(left);
+    document.title = clock(left) + " | " + timer.k;
+  } else {
+    document.title = "Time is up | " + timer.k;
+  }
+}
+function startTimer(k){
+  const h = parseInt(document.getElementById("h-" + k).value, 10) || 0;
+  const m = parseInt(document.getElementById("mi-" + k).value, 10) || 0;
+  const mins = h * 60 + m;
+  if (mins < 1) return;
+  if (timer && !timer.finished && !confirm("A timer for " + timer.k + " is running. Replace it?")) return;
+  stopRing();
+  const now = Date.now();
+  timer = {k, start: now, endAt: now + mins * 60000, mins};
+  saveTimer(); barState = ""; renderBar(); tickBar();
+  beep(); // unlocks audio so the alarm can sound later
+  try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
+}
+function clearTimer(){ stopRing(); timer = null; saveTimer(); renderBar(); }
+
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.dataset.start) startTimer(t.dataset.start);
+  else if (t.dataset.preset) {
+    const n = +t.dataset.preset, k = t.dataset.k;
+    lastDur.h = Math.floor(n / 60); lastDur.m = n % 60;
+    document.getElementById("h-" + k).value = lastDur.h;
+    document.getElementById("mi-" + k).value = lastDur.m;
+  }
+  else if (t.hasAttribute("data-tdismiss")) clearTimer();
+  else if (t.hasAttribute("data-tcancel")) clearTimer();
+  else if (t.hasAttribute("data-tstop")) {
+    const mins = Math.floor((Date.now() - timer.start) / 60000);
+    if (mins >= 1) { logSession(timer.k, timer.start, mins); render(); }
+    clearTimer();
+  }
+});
+document.addEventListener("input", e => {
+  const f = e.target.dataset && e.target.dataset.dur;
+  if (f) lastDur[f] = parseInt(e.target.value, 10) || 0;
+});
+document.addEventListener("visibilitychange", tickBar);
+
+render();
+renderBar();
+tickBar();
+setInterval(tickBar, 500);
+</script>
+</body>
+</html>
