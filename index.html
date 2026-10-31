@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Skill Routine Tracker</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1f7a5c">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{
   --bg:#f3f6f4; --surface:#ffffff; --ink:#1d2b26; --muted:#5d6e67; --line:#d5ded9;
@@ -322,6 +326,9 @@ render();
 renderBar();
 tickBar();
 setInterval(tickBar, 500);
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
 </script>
 </body>
 </html>
