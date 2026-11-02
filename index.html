@@ -88,29 +88,18 @@ footer{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
 
 <script>
 const CATS = [
-  ["Language & Communication", ["English","Japanese","Vocabulary","Speaking","Debate","Social skill","Persuasion / reading people"]],
+  ["Languages", ["English","Japanese","Filipino","Vocabulary"]],
+  ["Communication & Social", ["Speaking","Debate","Social skill","Persuasion / reading people","Skulduggery (cunning / trickery)"]],
   ["Cognitive & Academic", ["Chess","Memorization","Psychology","Science","Coding","Editing"]],
   ["Visual & Digital Arts", ["Drawing","Digital art"]],
-  ["Music & Vocal", ["Violin","Ukulele","Singing","Vocal synthesis (Vocaloid)"]],
+  ["Music & Vocal", ["Violin","Ukulele","Flute / recorder","Singing","Vocal synthesis (Vocaloid)"]],
   ["Performing Arts", ["Dancing","Tap dance","Mime","Magic tricks"]],
   ["Physical & Athletic", ["Swimming","Aerobics","Parkour","Martial arts / combat","Flexibility","Balance","Juggling"]],
-  ["Personal Care", ["Grooming / beauty care"]]
+  ["Personal Care", ["Grooming / beauty care","Makeup"]]
 ];
 const KEY = "skillRoutine:v1";
 let logs = {};
 try { logs = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { logs = {}; }
-// Migrate old position-based keys (e.g. "0-1") to skill names
-(function(){
-  const old = CATS.map(([c, sk]) => sk.filter(n => n !== "Japanese"));
-  Object.keys(logs).forEach(k => {
-    const m = /^(\d+)-(\d+)$/.exec(k);
-    if (!m) return;
-    const name = old[m[1]] && old[m[1]][m[2]];
-    if (name) logs[name] = (logs[name] || []).concat(logs[k]);
-    delete logs[k];
-  });
-  try { localStorage.setItem(KEY, JSON.stringify(logs)); } catch (e) {}
-})();
 const openCats = new Set([0]);
 const openSkills = new Set();
 
