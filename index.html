@@ -105,7 +105,7 @@ footer{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
 
 <script>
 const CATS = [
-  ["Languages", ["English","Japanese","Filipino","Vocabulary"]],
+  ["Languages", ["English","Japanese","Filipino","Vocabulary","Accents (speech / pronunciation)"]],
   ["Communication & Social", ["Speaking","Debate","Social skill","Persuasion / reading people","Skulduggery (cunning / trickery)","Essay writing"]],
   ["Cognitive & Academic", ["Chess","Memorization","Psychology","Science","Coding","Editing","Skulduggery (scheming / strategy)"]],
   ["Visual & Digital Arts", ["Drawing","Digital art","Photoshop"]],
@@ -137,7 +137,11 @@ function fmtDate(d){
   if (d.slice(0, 4) !== today().slice(0, 4)) o.year = "numeric";
   return new Date(d + "T00:00").toLocaleDateString(undefined, o);
 }
-const fmtFull = d => new Date(d + "T00:00").toLocaleDateString(undefined, {weekday:"short", year:"numeric", month:"short", day:"numeric"}) + (d === today() ? " (today)" : "");
+const fmtFull = d => {
+  const o = {weekday:"short", month:"long", day:"numeric"};
+  if (d.slice(0, 4) !== today().slice(0, 4)) o.year = "numeric";
+  return new Date(d + "T00:00").toLocaleDateString(undefined, o) + (d === today() ? " (today)" : "");
+};
 const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 const p2 = n => String(n).padStart(2, "0");
@@ -181,7 +185,7 @@ function calendar(calId, keys){
     : full + " day(s) fully done this month, " + (any - full) + " partly done";
   return `<div class="cal">
     <div class="calhead"><button data-calnav="${esc(calId)}" data-dir="-1" aria-label="Previous month">&lsaquo;</button>
-    <strong>${MONTHS[v.m]} ${v.y}</strong>
+    <strong>${MONTHS[v.m]}${v.y !== now.getFullYear() ? " " + v.y : ""}</strong>
     <button data-calnav="${esc(calId)}" data-dir="1" aria-label="Next month">&rsaquo;</button></div>
     <div class="grid"><b>S</b><b>M</b><b>T</b><b>W</b><b>T</b><b>F</b><b>S</b>${cells}</div>
     <p class="empty">${note}</p></div>`;
