@@ -66,6 +66,23 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
 .add.tm{margin-bottom:6px}
 .presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 .presets button{padding:3px 10px;font-size:.85rem}
+.cat.complete{border-color:var(--accent)}
+.cat.complete>summary .n{color:var(--accent);font-weight:700}
+.grouphead{display:flex;align-items:center;gap:10px;padding:0 16px 10px;font-size:.88rem;color:var(--accent)}
+.grouphead button{margin-left:auto;padding:3px 10px;font-size:.85rem}
+.panel.gp{padding-left:16px}
+.stats{margin:8px 0;font-size:.88rem;color:var(--muted)}
+.cal{margin:8px 0 12px;max-width:340px}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.calhead button{padding:2px 12px;font-size:1.1rem}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:.82rem}
+.grid b{color:var(--muted);font-weight:600}
+.day{padding:5px 0;border-radius:8px;border:1px solid transparent}
+.day.part{background:var(--done)}
+.day.full{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.day.today{border-color:var(--ink)}
+.log.scroll{max-height:300px;overflow-y:auto}
+.log li.dh{font-weight:700;border-bottom:1px solid var(--line);padding-top:10px}
 footer{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -116,9 +133,68 @@ function fmt12(t){
 }
 function fmtDate(d){
   if (d === today()) return "Today";
-  return new Date(d + "T00:00").toLocaleDateString(undefined, {month:"short", day:"numeric"});
+  const o = {month:"short", day:"numeric"};
+  if (d.slice(0, 4) !== today().slice(0, 4)) o.year = "numeric";
+  return new Date(d + "T00:00").toLocaleDateString(undefined, o);
 }
+const fmtFull = d => new Date(d + "T00:00").toLocaleDateString(undefined, {weekday:"short", year:"numeric", month:"short", day:"numeric"}) + (d === today() ? " (today)" : "");
 const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const p2 = n => String(n).padStart(2, "0");
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const openCal = new Set();
+const calView = {};
+const fmtMins = m => m >= 60 ? Math.floor(m / 60) + " h " + (m % 60) + " min" : m + " min";
+
+function stats(list){
+  const set = new Set(list.map(e => e.d));
+  const mins = list.reduce((a, e) => a + (e.m || 0), 0);
+  let streak = 0;
+  const dt = new Date();
+  if (!set.has(dt.toLocaleDateString("en-CA"))) dt.setDate(dt.getDate() - 1);
+  while (set.has(dt.toLocaleDateString("en-CA"))) { streak++; dt.setDate(dt.getDate() - 1); }
+  return {sessions: list.length, days: set.size, mins, streak};
+}
+function dayCounts(keys){
+  const counts = {};
+  keys.forEach(k => new Set(entries(k).map(e => e.d)).forEach(d => counts[d] = (counts[d] || 0) + 1));
+  return counts;
+}
+function calendar(calId, keys){
+  const now = new Date();
+  const v = calView[calId] || (calView[calId] = {y: now.getFullYear(), m: now.getMonth()});
+  const counts = dayCounts(keys);
+  const first = new Date(v.y, v.m, 1).getDay();
+  const days = new Date(v.y, v.m + 1, 0).getDate();
+  let cells = "", full = 0, any = 0;
+  for (let i = 0; i < first; i++) cells += "<span></span>";
+  for (let d = 1; d <= days; d++) {
+    const key = v.y + "-" + p2(v.m + 1) + "-" + p2(d);
+    const c = counts[key] || 0;
+    const cls = c > 0 && c === keys.length ? "full" : c > 0 ? "part" : "";
+    if (cls === "full") full++;
+    if (c) any++;
+    cells += `<span class="day ${cls} ${key === today() ? "today" : ""}" title="${c} of ${keys.length} skills">${d}</span>`;
+  }
+  const note = keys.length === 1
+    ? any + " day(s) practiced this month"
+    : full + " day(s) fully done this month, " + (any - full) + " partly done";
+  return `<div class="cal">
+    <div class="calhead"><button data-calnav="${esc(calId)}" data-dir="-1" aria-label="Previous month">&lsaquo;</button>
+    <strong>${MONTHS[v.m]} ${v.y}</strong>
+    <button data-calnav="${esc(calId)}" data-dir="1" aria-label="Next month">&rsaquo;</button></div>
+    <div class="grid"><b>S</b><b>M</b><b>T</b><b>W</b><b>T</b><b>F</b><b>S</b>${cells}</div>
+    <p class="empty">${note}</p></div>`;
+}
+function logList(k, list){
+  const sorted = list.map((e, i) => ({e, i})).sort((a, b) => (b.e.d + b.e.t).localeCompare(a.e.d + a.e.t));
+  let html = "", cur = "";
+  sorted.forEach(({e, i}) => {
+    if (e.d !== cur) { cur = e.d; html += `<li class="dh">${fmtFull(e.d)}</li>`; }
+    html += `<li><span>${fmt12(e.t)}${e.m ? " &middot; " + e.m + " min" : ""}</span><button class="x" data-del="${k}" data-i="${i}" aria-label="Delete entry">Delete</button></li>`;
+  });
+  return `<ul class="log scroll">${html}</ul>`;
+}
 
 function render(){
   let total = 0, done = 0;
@@ -131,7 +207,7 @@ function render(){
       const last = list.length ? list[list.length - 1] : null;
       let panel = "";
       if (openSkills.has(k)) {
-        const recent = list.slice().reverse().slice(0, 12);
+        const st = stats(list);
         panel = `<div class="panel">
           <p class="hd">Timer</p>
           <div class="add tm">
@@ -142,11 +218,15 @@ function render(){
           <div class="presets">${[15,30,45,60,90,105].map(n => `<button data-preset="${n}" data-k="${k}">${n >= 60 ? Math.floor(n/60) + " h" + (n % 60 ? " " + n % 60 + " min" : "") : n + " min"}</button>`).join("")}</div>
           <p class="hd">Log a time manually</p>
           <div class="add">
+            <label>Date<input type="date" id="d-${k}" value="${today()}"></label>
             <label>Time<input type="time" id="t-${k}" value="${nowTime()}"></label>
             <label>Minutes (optional)<input type="number" min="1" id="m-${k}" placeholder="e.g. 30"></label>
             <button class="primary" data-add="${k}">Add time</button>
           </div>
-          ${recent.length ? `<ul class="log">${recent.map(e => `<li><span class="d">${fmtDate(e.d)}</span><span>${fmt12(e.t)}${e.m ? " &middot; " + e.m + " min" : ""}</span><button class="x" data-del="${k}" data-i="${list.indexOf(e)}" aria-label="Delete entry">Delete</button></li>`).join("")}</ul>` : `<p class="empty">No time logged yet. Add your first session above.</p>`}
+          <p class="hd">History</p>
+          <p class="stats">${st.days} day(s) &middot; ${st.sessions} session(s) &middot; ${st.mins ? fmtMins(st.mins) + " timed &middot; " : ""}streak ${st.streak} day(s)</p>
+          ${calendar("s:" + k, [k])}
+          ${list.length ? logList(k, list) : `<p class="empty">No time logged yet. Add your first session above.</p>`}
         </div>`;
       }
       return `<div class="skill">
@@ -156,8 +236,14 @@ function render(){
           <span class="last">${last ? "Last: " + fmtDate(last.d) + ", " + fmt12(last.t) : ""}</span>
         </div>${panel}</div>`;
     }).join("");
-    return `<details class="cat" data-cat="${ci}" ${openCats.has(ci) ? "open" : ""}>
-      <summary>${esc(cat)}<span class="n">${catDone}/${skills.length} today</span></summary>${rows}</details>`;
+    const complete = catDone === skills.length;
+    const keysAll = skills.map((_, si) => id(ci, si));
+    const fullDays = Object.values(dayCounts(keysAll)).filter(c => c === keysAll.length).length;
+    return `<details class="cat ${complete ? "complete" : ""}" data-cat="${ci}" ${openCats.has(ci) ? "open" : ""}>
+      <summary>${esc(cat)}<span class="n">${complete ? "&#10003; Complete" : catDone + "/" + skills.length + " today"}</span></summary>
+      <div class="grouphead"><span>${complete ? "&#10003; Every skill in this group is done today." : ""}</span><button data-gcal="${ci}">${openCal.has("g:" + ci) ? "Hide" : "Show"} group history</button></div>
+      ${openCal.has("g:" + ci) ? `<div class="panel gp">${calendar("g:" + ci, keysAll)}<p class="stats">Days the whole group was done: ${fullDays}</p></div>` : ""}
+      ${rows}</details>`;
   }).join("");
   document.getElementById("count").textContent = done + " / " + total + " done today";
   document.getElementById("fill").style.width = (total ? done / total * 100 : 0) + "%";
@@ -170,10 +256,20 @@ document.getElementById("app").addEventListener("click", e => {
     render();
   } else if (t.dataset.add) {
     const k = t.dataset.add;
+    const date = document.getElementById("d-" + k).value || today();
     const time = document.getElementById("t-" + k).value || nowTime();
     const m = parseInt(document.getElementById("m-" + k).value, 10);
-    (logs[k] = logs[k] || []).push({d: today(), t: time, m: m > 0 ? m : null});
+    (logs[k] = logs[k] || []).push({d: date, t: time, m: m > 0 ? m : null});
     save(); render();
+  } else if (t.dataset.calnav) {
+    const v = calView[t.dataset.calnav];
+    v.m += +t.dataset.dir;
+    if (v.m < 0) { v.m = 11; v.y--; } else if (v.m > 11) { v.m = 0; v.y++; }
+    render();
+  } else if (t.dataset.gcal) {
+    const g = "g:" + t.dataset.gcal;
+    openCal.has(g) ? openCal.delete(g) : openCal.add(g);
+    render();
   } else if (t.dataset.del) {
     logs[t.dataset.del].splice(+t.dataset.i, 1);
     save(); render();
