@@ -1,4 +1,4 @@
-const CACHE = "skill-routine-v8";
+const CACHE = "skill-routine-v10";
 const FILES = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
